@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
 EXTRA_COMPOSE_FILE="$ROOT_DIR/docker-compose.extra.yml"
-IMAGE_NAME="${OPENCLAW_IMAGE:-ghcr.io/olsonale/openclaw-docker:latest}"
+IMAGE_NAME="${OPENCLAW_IMAGE:-openclaw:local}"
 EXTRA_MOUNTS="${OPENCLAW_EXTRA_MOUNTS:-}"
 HOME_VOLUME_NAME="${OPENCLAW_HOME_VOLUME:-}"
 
@@ -224,6 +224,15 @@ run_interactive_config() {
   fi
   echo ""
 
+  # Homebrew configuration
+  read -rp "Include Homebrew for skill dependencies? [y/N]: " homebrew_enable
+  if [[ "${homebrew_enable,,}" == "y" || "${homebrew_enable,,}" == "yes" ]]; then
+    OPENCLAW_INCLUDE_HOMEBREW=true
+  else
+    OPENCLAW_INCLUDE_HOMEBREW=false
+  fi
+  echo ""
+
   # Token generation (never prompt, always auto-generate if not set)
   if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
     echo "Generating secure token..."
@@ -250,6 +259,7 @@ export OPENCLAW_GATEWAY_BIND
 export OPENCLAW_GATEWAY_TOKEN
 export OPENCLAW_IMAGE="$IMAGE_NAME"
 export OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-}"
+export OPENCLAW_INCLUDE_HOMEBREW="${OPENCLAW_INCLUDE_HOMEBREW:-false}"
 export OPENCLAW_EXTRA_MOUNTS="$EXTRA_MOUNTS"
 export OPENCLAW_HOME_VOLUME="$HOME_VOLUME_NAME"
 
@@ -372,6 +382,7 @@ ENV_KEYS=(
   OPENCLAW_EXTRA_MOUNTS
   OPENCLAW_HOME_VOLUME
   OPENCLAW_DOCKER_APT_PACKAGES
+  OPENCLAW_INCLUDE_HOMEBREW
 )
 
 # Add TS_AUTHKEY if Tailscale is enabled
@@ -387,8 +398,13 @@ if [[ "$IMAGE_NAME" == *"/"* ]]; then
   docker pull "$IMAGE_NAME"
 else
   echo "==> Building Docker image: $IMAGE_NAME"
+  DOCKER_TARGET="runtime"
+  if [[ "${OPENCLAW_INCLUDE_HOMEBREW:-false}" == "true" ]]; then
+    DOCKER_TARGET="runtime-homebrew"
+  fi
   docker build \
     --build-arg "OPENCLAW_DOCKER_APT_PACKAGES=${OPENCLAW_DOCKER_APT_PACKAGES}" \
+    --target "$DOCKER_TARGET" \
     -t "$IMAGE_NAME" \
     -f "$ROOT_DIR/Dockerfile" \
     "$ROOT_DIR"
