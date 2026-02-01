@@ -37,9 +37,9 @@ LABEL org.opencontainers.image.source="https://github.com/olsonale/openclaw-dock
 COPY --from=tianon/gosu:1.17 /usr/local/bin/gosu /usr/local/bin/gosu
 
 # Copy Tailscale binaries directly from official image (faster than apt)
-COPY --from=tailscale/tailscale:v1.76.6 /usr/local/bin/containerboot /usr/local/bin/containerboot
-COPY --from=tailscale/tailscale:v1.76.6 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=tailscale/tailscale:v1.76.6 /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=tailscale/tailscale:v1.92.5 /usr/local/bin/containerboot /usr/local/bin/containerboot
+COPY --from=tailscale/tailscale:v1.92.5 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=tailscale/tailscale:v1.92.5 /usr/local/bin/tailscale /usr/local/bin/tailscale
 
 # Install Bun from official image (safer than curl|bash pattern)
 ARG BUN_VERSION=1.1.42
