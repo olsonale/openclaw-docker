@@ -4,18 +4,24 @@ set -e
 # Use HOME from environment, default to /home/node
 USER_HOME="${HOME:-/home/node}"
 
-# Check if we're running as PID 1 (container startup) or exec'd into existing container
-is_container_startup() {
-  [ "$$" = "1" ] || [ ! -f /tmp/.openclaw-init-done ]
+# Check if we need to run privileged init (first run or exec'd into existing container)
+# Note: With init: true in docker-compose, tini is PID 1, not this script
+needs_privileged_init() {
+  [ ! -f /tmp/.openclaw-init-done ]
 }
 
-if is_container_startup; then
+if needs_privileged_init; then
   # Container startup: need to do privileged setup first
 
   # Ensure config directories exist and are owned by node user
-  # (fixes Docker creating bind-mount directories as root:root)
-  mkdir -p "$USER_HOME/.openclaw" "$USER_HOME/.moltbot" "$USER_HOME/.clawdbot" "$USER_HOME/clawd"
-  chown -R node:node "$USER_HOME/.openclaw" "$USER_HOME/.moltbot" "$USER_HOME/.clawdbot" "$USER_HOME/clawd"
+  # (fallback if install.sh didn't set permissions, or Docker created dirs as root)
+  for dir in "$USER_HOME/.openclaw" "$USER_HOME/.moltbot" "$USER_HOME/.clawdbot" "$USER_HOME/clawd"; do
+    mkdir -p "$dir"
+    # Only chown if not already owned by node (UID 1000)
+    if [ "$(stat -c %u "$dir" 2>/dev/null)" != "1000" ]; then
+      chown -R node:node "$dir" 2>/dev/null || true
+    fi
+  done
 
   # Start tailscaled in the background using containerboot's approach
   # Note: Tailscale requires root/CAP_NET_ADMIN, so this runs before dropping privileges

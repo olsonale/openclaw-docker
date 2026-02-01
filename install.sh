@@ -247,9 +247,30 @@ run_interactive_config() {
 # Run the interactive configuration
 run_interactive_config
 
-# Create directories
+# Create directories with correct ownership for container (node user = UID 1000)
 mkdir -p "$OPENCLAW_CONFIG_DIR"
 mkdir -p "$OPENCLAW_WORKSPACE_DIR"
+
+# Set ownership to UID 1000 (node user in container) so bind mounts are writable
+fix_permissions() {
+  local dir="$1"
+  if [[ $(id -u) -eq 1000 ]]; then
+    # Already running as UID 1000, no change needed
+    return 0
+  elif [[ $(id -u) -eq 0 ]]; then
+    chown -R 1000:1000 "$dir"
+  elif command -v sudo >/dev/null 2>&1; then
+    echo "Setting permissions on $dir (requires sudo)..."
+    sudo chown -R 1000:1000 "$dir"
+  else
+    echo "WARNING: Cannot set ownership on $dir to UID 1000."
+    echo "You may need to run: sudo chown -R 1000:1000 $dir"
+    return 1
+  fi
+}
+
+fix_permissions "$OPENCLAW_CONFIG_DIR" || true
+fix_permissions "$OPENCLAW_WORKSPACE_DIR" || true
 
 # Export all configuration variables
 export OPENCLAW_CONFIG_DIR
