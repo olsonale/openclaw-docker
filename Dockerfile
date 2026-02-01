@@ -24,8 +24,8 @@ RUN pnpm ui:build
 # Prune dev dependencies for smaller runtime image
 RUN CI=true pnpm prune --prod
 
-# ============ RUNTIME STAGE ============
-FROM node:22-bookworm
+# ============ RUNTIME BASE (shared) ============
+FROM node:22-bookworm AS runtime-base
 
 # OCI Image Labels
 LABEL org.opencontainers.image.title="OpenClaw Docker"
@@ -46,13 +46,6 @@ ARG BUN_VERSION=1.1.42
 COPY --from=oven/bun:1.1.42 /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=oven/bun:1.1.42 /usr/local/bin/bunx /usr/local/bin/bunx
 
-# Copy Homebrew from official image (faster than git clone)
-COPY --from=homebrew/brew:latest /home/linuxbrew/.linuxbrew /home/node/.linuxbrew
-ENV PATH="/home/node/.linuxbrew/bin:/home/node/.linuxbrew/sbin:${PATH}"
-ENV HOMEBREW_PREFIX="/home/node/.linuxbrew"
-ENV HOMEBREW_CELLAR="/home/node/.linuxbrew/Cellar"
-ENV HOMEBREW_REPOSITORY="/home/node/.linuxbrew/Homebrew"
-
 # Optional: install additional apt packages for skills
 ARG OPENCLAW_DOCKER_APT_PACKAGES=""
 RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then \
@@ -63,15 +56,13 @@ RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then \
     fi
 
 # Copy built application from builder (production deps only)
-COPY --from=builder /app/dist /app/dist
-COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/package.json /app/package.json
+# Use --chown during COPY (faster than separate chown -R layer)
+COPY --from=builder --chown=node:node /app/dist /app/dist
+COPY --from=builder --chown=node:node /app/node_modules /app/node_modules
+COPY --from=builder --chown=node:node /app/package.json /app/package.json
 
 WORKDIR /app
 ENV NODE_ENV=production
-
-# Ensure Homebrew, cache, and app directories are owned by node user
-RUN mkdir -p /home/node/.cache && chown -R node:node /home/node/.linuxbrew /home/node/.cache /app
 
 # Copy entrypoint script for Tailscale setup
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -86,3 +77,18 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "dist/index.js"]
+
+# ============ RUNTIME (default, no Homebrew) ============
+FROM runtime-base AS runtime
+RUN mkdir -p /home/node/.cache && chown node:node /home/node/.cache
+
+# ============ RUNTIME WITH HOMEBREW ============
+FROM runtime-base AS runtime-homebrew
+# Use --chown to set ownership during copy (faster than separate chown layer)
+# Note: linuxbrew user (UID 1000) matches node user (UID 1000), so this may be redundant
+COPY --from=homebrew/brew:latest --chown=node:node /home/linuxbrew/.linuxbrew /home/node/.linuxbrew
+ENV PATH="/home/node/.linuxbrew/bin:/home/node/.linuxbrew/sbin:${PATH}"
+ENV HOMEBREW_PREFIX="/home/node/.linuxbrew"
+ENV HOMEBREW_CELLAR="/home/node/.linuxbrew/Cellar"
+ENV HOMEBREW_REPOSITORY="/home/node/.linuxbrew/Homebrew"
+RUN mkdir -p /home/node/.cache && chown node:node /home/node/.cache
