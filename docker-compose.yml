@@ -1,0 +1,67 @@
+services:
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.openclaw
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.moltbot
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.clawdbot
+      - ${OPENCLAW_WORKSPACE_DIR:-${CLAWDBOT_WORKSPACE_DIR:-./workspace}}:/home/node/clawd
+      - ${TS_STATE_DIR:-./tailscale-state}:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN  # Required by Tailscale for VPN networking
+      - SETUID     # Required by gosu to switch to node user
+      - SETGID     # Required by gosu to switch to node user
+      - CHOWN      # Required to fix ownership of mounted volumes
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--bind",
+        "${OPENCLAW_GATEWAY_BIND:-loopback}",
+        "--port",
+        "${OPENCLAW_GATEWAY_PORT:-18789}",
+        "--allow-unconfigured"
+      ]
+
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.openclaw
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.moltbot
+      - ${OPENCLAW_CONFIG_DIR:-${CLAWDBOT_CONFIG_DIR:-./.openclaw}}:/home/node/.clawdbot
+      - ${OPENCLAW_WORKSPACE_DIR:-${CLAWDBOT_WORKSPACE_DIR:-./workspace}}:/home/node/clawd
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID  # Required by gosu to switch to node user
+      - SETGID  # Required by gosu to switch to node user
+      - CHOWN   # Required to fix ownership of mounted volumes
+    stdin_open: true
+    tty: true
+    init: true
+    command: ["node", "dist/index.js"]
