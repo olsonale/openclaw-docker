@@ -170,11 +170,12 @@ run_interactive_config() {
   echo "Press Enter to accept defaults shown in brackets."
   echo ""
 
-  # Directory configuration (auto-defaulted, just shown)
-  OPENCLAW_CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-$HOME/.openclaw}"
-  OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-$HOME/.openclaw/workspace}"
-  echo "Config directory: $OPENCLAW_CONFIG_DIR"
-  echo "Workspace: $OPENCLAW_WORKSPACE_DIR"
+  # Directory configuration
+  local default_config_dir="${OPENCLAW_CONFIG_DIR:-$HOME/.openclaw}"
+  OPENCLAW_CONFIG_DIR=$(prompt_with_default "Config directory" "$default_config_dir")
+
+  local default_workspace_dir="${OPENCLAW_WORKSPACE_DIR:-$OPENCLAW_CONFIG_DIR/workspace}"
+  OPENCLAW_WORKSPACE_DIR=$(prompt_with_default "Workspace directory" "$default_workspace_dir")
   echo ""
 
   # Gateway port
@@ -419,16 +420,16 @@ echo "  - Gateway token: $OPENCLAW_GATEWAY_TOKEN"
 echo "  - Tailscale exposure: Off"
 echo "  - Install Gateway daemon: No"
 echo ""
-docker compose "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+docker compose "${COMPOSE_ARGS[@]}" run --rm openclaw-cli node dist/index.js onboard --no-install-daemon
 
 echo ""
 echo "==> Provider setup (optional)"
 echo "WhatsApp (QR):"
-echo "  ${COMPOSE_HINT} run --rm openclaw-cli providers login"
+echo "  ${COMPOSE_HINT} run --rm openclaw-cli node dist/index.js providers login"
 echo "Telegram (bot token):"
-echo "  ${COMPOSE_HINT} run --rm openclaw-cli providers add --provider telegram --token <token>"
+echo "  ${COMPOSE_HINT} run --rm openclaw-cli node dist/index.js providers add --provider telegram --token <token>"
 echo "Discord (bot token):"
-echo "  ${COMPOSE_HINT} run --rm openclaw-cli providers add --provider discord --token <token>"
+echo "  ${COMPOSE_HINT} run --rm openclaw-cli node dist/index.js providers add --provider discord --token <token>"
 echo "Docs: https://docs.openclaw.ai/providers"
 
 echo ""
@@ -481,5 +482,5 @@ echo "  View logs:     ${COMPOSE_HINT} logs -f openclaw-gateway"
 echo "  Stop:          ${COMPOSE_HINT} down"
 echo "  Restart:       ${COMPOSE_HINT} restart openclaw-gateway"
 echo "  Reconfigure:   ./install.sh"
-echo "  Health check:  ${COMPOSE_HINT} exec openclaw-gateway node dist/index.js health --token \"$OPENCLAW_GATEWAY_TOKEN\""
+echo "  Health check:  curl -s http://localhost:${OPENCLAW_GATEWAY_PORT}/health"
 echo ""
