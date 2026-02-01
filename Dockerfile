@@ -56,10 +56,19 @@ RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then \
     fi
 
 # Copy built application from builder (production deps only)
-# Use --chown during COPY (faster than separate chown -R layer)
+# Runtime needs:
+#   - dist/          compiled code, bundled hooks, control-ui
+#   - node_modules/  production dependencies
+#   - package.json   package metadata (for resolveOpenClawPackageRoot)
+#   - extensions/    bundled plugins (memory-core, etc.)
+#   - skills/        bundled skills
+#   - docs/          documentation and workspace templates
 COPY --from=builder --chown=node:node /app/dist /app/dist
 COPY --from=builder --chown=node:node /app/node_modules /app/node_modules
 COPY --from=builder --chown=node:node /app/package.json /app/package.json
+COPY --from=builder --chown=node:node /app/extensions /app/extensions
+COPY --from=builder --chown=node:node /app/skills /app/skills
+COPY --from=builder --chown=node:node /app/docs /app/docs
 
 WORKDIR /app
 ENV NODE_ENV=production
