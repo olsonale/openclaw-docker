@@ -31,7 +31,7 @@ FROM node:22-bookworm AS runtime-base
 LABEL org.opencontainers.image.title="OpenClaw Docker"
 LABEL org.opencontainers.image.description="Docker setup for OpenClaw - AI-powered coding assistant"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.source="https://github.com/openclaw/openclaw"
+LABEL org.opencontainers.image.source="https://github.com/olsonale/openclaw-docker"
 
 # Copy gosu for privilege dropping (faster than apt)
 COPY --from=tianon/gosu:1.17 /usr/local/bin/gosu /usr/local/bin/gosu
