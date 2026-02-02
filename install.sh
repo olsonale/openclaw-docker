@@ -35,55 +35,6 @@ prompt_with_default() {
   echo "${result:-$default}"
 }
 
-prompt_select() {
-  local prompt="$1"
-  local default="$2"
-  shift 2
-  local -a options=("$@")
-  local choice
-
-  echo "$prompt"
-  local i=1
-  for opt in "${options[@]}"; do
-    echo "  $i) $opt"
-    ((i++))
-  done
-
-  while true; do
-    read -rp "Choice [1-${#options[@]}] (default: $default): " choice
-    choice="${choice:-$default}"
-    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
-      echo "$choice"
-      return
-    fi
-    echo "Please enter a number between 1 and ${#options[@]}"
-  done
-}
-
-validate_port() {
-  local port="$1"
-  if [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )); then
-    return 0
-  fi
-  return 1
-}
-
-prompt_port() {
-  local prompt="$1"
-  local default="$2"
-  local port
-
-  while true; do
-    read -rp "$prompt [$default]: " port
-    port="${port:-$default}"
-    if validate_port "$port"; then
-      echo "$port"
-      return
-    fi
-    echo "Please enter a valid port number (1-65535)"
-  done
-}
-
 generate_token() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -115,9 +66,6 @@ show_current_config() {
   echo "Current configuration:"
   echo "  Config directory: ${OPENCLAW_CONFIG_DIR:-not set}"
   echo "  Workspace: ${OPENCLAW_WORKSPACE_DIR:-not set}"
-  echo "  Gateway port: ${OPENCLAW_GATEWAY_PORT:-not set}"
-  echo "  Bridge port: ${OPENCLAW_BRIDGE_PORT:-not set}"
-  echo "  Bind mode: ${OPENCLAW_GATEWAY_BIND:-not set}"
   if [[ -n "${TS_AUTHKEY:-}" ]]; then
     echo "  Tailscale: enabled"
   else
@@ -176,37 +124,6 @@ run_interactive_config() {
 
   local default_workspace_dir="${OPENCLAW_WORKSPACE_DIR:-$OPENCLAW_CONFIG_DIR/workspace}"
   OPENCLAW_WORKSPACE_DIR=$(prompt_with_default "Workspace directory" "$default_workspace_dir")
-  echo ""
-
-  # Gateway port
-  local default_port="${OPENCLAW_GATEWAY_PORT:-18789}"
-  OPENCLAW_GATEWAY_PORT=$(prompt_port "Gateway port" "$default_port")
-
-  # Bridge port (auto-set to gateway + 1)
-  OPENCLAW_BRIDGE_PORT=$((OPENCLAW_GATEWAY_PORT + 1))
-  echo "Bridge port: $OPENCLAW_BRIDGE_PORT"
-  echo ""
-
-  # Bind mode selection
-  echo "Select bind mode:"
-  local bind_options=(
-    "loopback - localhost only (most secure)"
-    "lan - local network (recommended)"
-    "all - any network (use with caution)"
-  )
-  local bind_choice
-  bind_choice=$(prompt_select "" "2" "${bind_options[@]}")
-
-  case "$bind_choice" in
-    1) OPENCLAW_GATEWAY_BIND="loopback" ;;
-    2) OPENCLAW_GATEWAY_BIND="lan" ;;
-    3)
-      OPENCLAW_GATEWAY_BIND="all"
-      echo ""
-      echo "WARNING: 'all' mode exposes the gateway to any network."
-      echo "Make sure you understand the security implications."
-      ;;
-  esac
   echo ""
 
   # Tailscale configuration
@@ -284,9 +201,6 @@ fi
 # Export all configuration variables
 export OPENCLAW_CONFIG_DIR
 export OPENCLAW_WORKSPACE_DIR
-export OPENCLAW_GATEWAY_PORT
-export OPENCLAW_BRIDGE_PORT
-export OPENCLAW_GATEWAY_BIND
 export OPENCLAW_GATEWAY_TOKEN
 export OPENCLAW_IMAGE="$IMAGE_NAME"
 export OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-}"
@@ -405,9 +319,6 @@ upsert_env() {
 ENV_KEYS=(
   OPENCLAW_CONFIG_DIR
   OPENCLAW_WORKSPACE_DIR
-  OPENCLAW_GATEWAY_PORT
-  OPENCLAW_BRIDGE_PORT
-  OPENCLAW_GATEWAY_BIND
   OPENCLAW_GATEWAY_TOKEN
   OPENCLAW_IMAGE
   OPENCLAW_EXTRA_MOUNTS
@@ -472,37 +383,12 @@ echo "  OpenClaw Gateway Running"
 echo "======================================"
 echo ""
 
-# Show connection URLs based on bind mode
-echo "Connection URLs:"
-case "$OPENCLAW_GATEWAY_BIND" in
-  loopback)
-    echo "  http://localhost:$OPENCLAW_GATEWAY_PORT"
-    ;;
-  lan)
-    echo "  http://localhost:$OPENCLAW_GATEWAY_PORT"
-    # Try to get the local IP address
-    if command -v hostname >/dev/null 2>&1; then
-      local_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
-      if [[ -n "$local_ip" ]]; then
-        echo "  http://${local_ip}:$OPENCLAW_GATEWAY_PORT"
-      fi
-    fi
-    ;;
-  all)
-    echo "  http://localhost:$OPENCLAW_GATEWAY_PORT"
-    echo "  http://<your-ip>:$OPENCLAW_GATEWAY_PORT"
-    ;;
-esac
-
-if [[ -n "${TS_AUTHKEY:-}" ]]; then
-  echo "  (Tailscale: accessible via your tailnet)"
-fi
-
-echo ""
 echo "Configuration:"
 echo "  Config directory: $OPENCLAW_CONFIG_DIR"
 echo "  Workspace: $OPENCLAW_WORKSPACE_DIR"
-echo "  Bind mode: $OPENCLAW_GATEWAY_BIND"
+if [[ -n "${TS_AUTHKEY:-}" ]]; then
+  echo "  Tailscale: enabled"
+fi
 echo ""
 echo "Authentication Token:"
 echo "  $OPENCLAW_GATEWAY_TOKEN"
@@ -512,5 +398,4 @@ echo "  View logs:     ${COMPOSE_HINT} logs -f openclaw-gateway"
 echo "  Stop:          ${COMPOSE_HINT} down"
 echo "  Restart:       ${COMPOSE_HINT} restart openclaw-gateway"
 echo "  Reconfigure:   ./install.sh"
-echo "  Health check:  curl -s http://localhost:${OPENCLAW_GATEWAY_PORT}/health"
 echo ""
