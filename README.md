@@ -14,16 +14,13 @@ Dockerized deployment for OpenClaw - an AI-powered coding assistant with gateway
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/your-org/openclaw-docker.git
+git clone https://github.com/olsonale/openclaw-docker.git
 cd openclaw-docker
-
-# Copy example config and edit
-cp .env.example .env
 ```
 
 ### 2. Set Required Variables
 
-Edit `.env` and set:
+Create `.env` and set:
 
 ```bash
 # Required directories (create these first)
