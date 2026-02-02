@@ -45,4 +45,9 @@ if needs_privileged_init; then
 fi
 
 # Drop privileges and run the command as 'node' user
-exec gosu node "$@"
+# Skip gosu if already running as node (UID 1000) - e.g., when --user is passed
+if [ "$(id -u)" = "1000" ]; then
+  exec "$@"
+else
+  exec gosu node "$@"
+fi

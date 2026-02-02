@@ -99,8 +99,8 @@ install_shell_aliases() {
   cat >> "$rc_file" << EOF
 
 $marker
-alias openclaw='$compose_cmd run --rm -u node openclaw-cli node dist/index.js'
-alias openclaw-gateway='$compose_cmd exec -u node openclaw-gateway node dist/index.js'
+alias openclaw='$compose_cmd run --rm --user node openclaw-cli node dist/index.js'
+alias openclaw-gateway='$compose_cmd exec openclaw-gateway node dist/index.js'
 # End OpenClaw aliases
 EOF
 
@@ -438,8 +438,8 @@ if [[ "${install_aliases,,}" == "y" || "${install_aliases,,}" == "yes" ]]; then
   else
     echo "Could not detect shell configuration file (bash/zsh required)."
     echo "You can manually add these aliases:"
-    echo "  alias openclaw='$COMPOSE_HINT run --rm -u node openclaw-cli node dist/index.js'"
-    echo "  alias openclaw-gateway='$COMPOSE_HINT exec -u node openclaw-gateway node dist/index.js'"
+    echo "  alias openclaw='$COMPOSE_HINT run --rm --user node openclaw-cli node dist/index.js'"
+    echo "  alias openclaw-gateway='$COMPOSE_HINT exec openclaw-gateway node dist/index.js'"
   fi
 fi
 
