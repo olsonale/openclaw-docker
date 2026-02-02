@@ -220,6 +220,9 @@ run_interactive_config() {
       fi
       echo "Auth key is required when Tailscale is enabled."
     done
+    local default_ts_state_dir="${TS_STATE_DIR:-$OPENCLAW_CONFIG_DIR/tailscale-state}"
+    TS_STATE_DIR=$(prompt_with_default "Tailscale state directory" "$default_ts_state_dir")
+    export TS_STATE_DIR
   else
     unset TS_AUTHKEY 2>/dev/null || true
   fi
@@ -271,6 +274,12 @@ fix_permissions() {
 
 fix_permissions "$OPENCLAW_CONFIG_DIR" || true
 fix_permissions "$OPENCLAW_WORKSPACE_DIR" || true
+
+# Create Tailscale state directory if enabled
+if [[ -n "${TS_STATE_DIR:-}" ]]; then
+  mkdir -p "$TS_STATE_DIR"
+  fix_permissions "$TS_STATE_DIR" || true
+fi
 
 # Export all configuration variables
 export OPENCLAW_CONFIG_DIR
@@ -407,9 +416,9 @@ ENV_KEYS=(
   OPENCLAW_INCLUDE_HOMEBREW
 )
 
-# Add TS_AUTHKEY if Tailscale is enabled
+# Add Tailscale keys if enabled
 if [[ -n "${TS_AUTHKEY:-}" ]]; then
-  ENV_KEYS+=(TS_AUTHKEY)
+  ENV_KEYS+=(TS_AUTHKEY TS_STATE_DIR)
 fi
 
 upsert_env "$ENV_FILE" "${ENV_KEYS[@]}"
