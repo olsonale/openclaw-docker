@@ -61,6 +61,52 @@ config_exists() {
   [[ -f "$ENV_FILE" ]] && grep -q "OPENCLAW_GATEWAY_TOKEN" "$ENV_FILE" 2>/dev/null
 }
 
+detect_shell_rc() {
+  local shell_name
+  shell_name="$(basename "$SHELL")"
+
+  case "$shell_name" in
+    bash)
+      if [[ -f "$HOME/.bashrc" ]]; then
+        echo "$HOME/.bashrc"
+      elif [[ -f "$HOME/.bash_profile" ]]; then
+        echo "$HOME/.bash_profile"
+      fi
+      ;;
+    zsh)
+      echo "$HOME/.zshrc"
+      ;;
+    *)
+      # Unsupported shell
+      echo ""
+      ;;
+  esac
+}
+
+install_shell_aliases() {
+  local rc_file="$1"
+  local compose_cmd="$2"
+  local marker="# OpenClaw aliases"
+
+  # Check if aliases already exist
+  if grep -q "$marker" "$rc_file" 2>/dev/null; then
+    echo "Aliases already exist in $rc_file, updating..."
+    # Remove old aliases block
+    sed -i.bak "/$marker/,/# End OpenClaw aliases/d" "$rc_file"
+  fi
+
+  # Append new aliases
+  cat >> "$rc_file" << EOF
+
+$marker
+alias openclaw='$compose_cmd run --rm -u node openclaw-cli node dist/index.js'
+alias openclaw-gateway='$compose_cmd exec -u node openclaw-gateway node dist/index.js'
+# End OpenClaw aliases
+EOF
+
+  echo "Aliases added to $rc_file"
+}
+
 show_current_config() {
   echo ""
   echo "Current configuration:"
@@ -377,6 +423,26 @@ echo ""
 echo "==> Starting gateway"
 docker compose "${COMPOSE_ARGS[@]}" up -d openclaw-gateway
 
+# Shell alias installation
+echo ""
+read -rp "Add shell aliases for 'openclaw' and 'openclaw-gateway'? [y/N]: " install_aliases
+if [[ "${install_aliases,,}" == "y" || "${install_aliases,,}" == "yes" ]]; then
+  rc_file=$(detect_shell_rc)
+  if [[ -n "$rc_file" ]]; then
+    install_shell_aliases "$rc_file" "$COMPOSE_HINT"
+    echo ""
+    echo "To use the aliases now, run:"
+    echo "  source $rc_file"
+    echo ""
+    echo "Or restart your terminal."
+  else
+    echo "Could not detect shell configuration file (bash/zsh required)."
+    echo "You can manually add these aliases:"
+    echo "  alias openclaw='$COMPOSE_HINT run --rm -u node openclaw-cli node dist/index.js'"
+    echo "  alias openclaw-gateway='$COMPOSE_HINT exec -u node openclaw-gateway node dist/index.js'"
+  fi
+fi
+
 echo ""
 echo "======================================"
 echo "  OpenClaw Gateway Running"
@@ -394,8 +460,9 @@ echo "Authentication Token:"
 echo "  $OPENCLAW_GATEWAY_TOKEN"
 echo ""
 echo "Commands:"
+echo "  CLI help:      openclaw --help"
+echo "  Gateway status: openclaw-gateway gateway status"
 echo "  View logs:     ${COMPOSE_HINT} logs -f openclaw-gateway"
 echo "  Stop:          ${COMPOSE_HINT} down"
-echo "  Restart:       ${COMPOSE_HINT} restart openclaw-gateway"
 echo "  Reconfigure:   ./install.sh"
 echo ""
