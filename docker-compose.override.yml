@@ -1,0 +1,7 @@
+# Local development overrides - uses locally built image
+services:
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
